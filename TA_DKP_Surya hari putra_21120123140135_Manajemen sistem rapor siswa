@@ -1,0 +1,262 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import filedialog
+from collections import deque
+import os
+import json
+
+class NilaiSiswaApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("manajemen sistem Rapor siswa")
+
+        # fitur atur warna background
+        self.master.configure(bg='green')
+
+        # Inisialisasi deque untuk menyimpan history
+        self.history = deque(maxlen=10)  # Maksimal menyimpan 10 history
+
+        # Load history from file
+        self.load_history()
+
+        # Frame untuk form input
+        self.input_frame = tk.Frame(master, bg='cyan')
+        self.input_frame.pack(padx=10, pady=10)
+
+        # Label dan entry untuk nama siswa
+        self.label_nama = tk.Label(self.input_frame, text="Nama Siswa:", bg='green')
+        self.label_nama.grid(row=0, column=0, padx=5, pady=5)
+        
+        # Validasi nama siswa hanya berupa huruf
+        vcmd = (self.master.register(self.validate_name), '%P')
+        self.nama_entry = tk.Entry(self.input_frame, validate='key', validatecommand=vcmd)
+        self.nama_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Label dan entry untuk jumlah nilai
+        self.label_jumlah_nilai = tk.Label(self.input_frame, text="Jumlah Nilai:", bg='green')
+        self.label_jumlah_nilai.grid(row=1, column=0, padx=5, pady=5)
+        self.jumlah_nilai_entry = tk.Entry(self.input_frame)
+        self.jumlah_nilai_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # Tombol untuk membuat entri nilai
+        self.buat_entri_button = tk.Button(self.input_frame, text="Buat Entri Nilai",bg='green', command=self.buat_entri_nilai ) 
+        self.buat_entri_button.grid(row=1, column=2, padx=5, pady=5)
+        
+
+        # Frame untuk entri nilai-nilai dan checkbox dengan scroll bar
+        self.nilai_frame = tk.Frame(master)
+        self.nilai_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        self.canvas = tk.Canvas(self.nilai_frame)
+        self.scrollbar = tk.Scrollbar(self.nilai_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+        # List untuk menyimpan entri nilai dan checkbox
+        self.nilai_entri_list = []
+        self.include_checkbox_list = []
+
+        # Tombol untuk menghitung rata-rata
+        self.hitung_button = tk.Button(master, text="Hitung Rata-rata Siswa", command=self.hitung_rata_rata)
+        self.hitung_button.pack(pady=10)
+
+        # Label untuk menampilkan hasil rata-rata
+        self.rata_rata_label = tk.Label(master, text="")
+        self.rata_rata_label.pack(pady=10)
+
+        # Tombol untuk menampilkan history
+        self.history_button = tk.Button(master, text="Tampilkan History", command=self.tampilkan_history)
+        self.history_button.pack(pady=10)
+
+        # Tombol untuk menyimpan history ke file teks
+        self.simpan_history_button = tk.Button(master, text="Simpan History ke Penyimpanan Lokal", command=self.simpan_history_teks)
+        self.simpan_history_button.pack(pady=10)
+
+        # Tombol untuk reset history
+        self.reset_history_button = tk.Button(master, text="Reset History", command=self.reset_history)
+        self.reset_history_button.pack(pady=10)
+
+        # Text widget untuk menampilkan history
+        self.history_text = tk.Text(master, height=10, state='disabled')
+        self.history_text.pack(pady=10)
+
+    def validate_name(self, new_value):
+        """
+        Validasi agar nama hanya mengandung huruf.
+        """
+        if new_value.isalpha() or new_value == "":
+            return True
+        else:
+            return False
+
+    def buat_entri_nilai(self):
+        """
+        Fungsi untuk membuat entri nilai dan checkbox berdasarkan jumlah nilai yang dimasukkan oleh pengguna.
+        """
+        try:
+            jumlah_nilai = int(self.jumlah_nilai_entry.get())
+            for widget in self.scrollable_frame.winfo_children():
+                widget.destroy()
+            self.nilai_entri_list.clear()
+            self.include_checkbox_list.clear()
+            for i in range(jumlah_nilai):
+                label_nilai = tk.Label(self.scrollable_frame, text=f"Nilai {i + 1}:")
+                label_nilai.grid(row=i, column=0, padx=5, pady=5)
+                nilai_entri = tk.Entry(self.scrollable_frame)
+                nilai_entri.grid(row=i, column=1, padx=5, pady=5)
+                self.nilai_entri_list.append(nilai_entri)
+
+                include_var = tk.BooleanVar(value=True)
+                include_checkbox = tk.Checkbutton(self.scrollable_frame, text="Include", variable=include_var)
+                include_checkbox.grid(row=i, column=2, padx=5, pady=5)
+                self.include_checkbox_list.append(include_var)
+        except ValueError:
+            messagebox.showerror("Input Error", "Jumlah nilai harus berupa angka yah!")
+
+    def hitung_rata_rata(self):
+        """
+        Fungsi untuk menghitung rata-rata nilai rapor siswa dan menentukan predikat.
+        """
+        try:
+            nama_siswa = self.nama_entry.get()
+            if not nama_siswa:
+                messagebox.showerror("Input Error", "Nama siswa tidak boleh kosong??!!")
+                return
+            nilai_list = []
+            for nilai_entri, include_var in zip(self.nilai_entri_list, self.include_checkbox_list):
+                if include_var.get():
+                    nilai_str = nilai_entri.get()
+                    if nilai_str == "":
+                        messagebox.showerror("Input Error", "Semua nilai yang diikutkan harus diisi!!!")
+                        return
+                    nilai = float(nilai_str)
+                    if nilai < 0 or nilai > 100:
+                        messagebox.showerror("Input Error", "Nilai harus antara 0 dan 100!!!")
+                        return
+                    nilai_list.append(nilai)
+
+            if not nilai_list:
+                messagebox.showerror("Input Error", "Tidak ada nilai yang diikutkan dalam perhitungan!!!!!")
+                return
+
+            rata_rata = sum(nilai_list) / len(nilai_list)
+            predikat = self.dapatkan_predikat(rata_rata)
+            hasil = f"Rata-rata {nama_siswa}: {rata_rata:.2f} ({predikat})"
+            self.rata_rata_label.config(text=hasil)
+
+            # Tambahkan hasil ke history dan simpan
+            self.history.appendleft(hasil)
+            self.save_history()
+        except ValueError:
+            messagebox.showerror("Input Error", "Nilai tidak valid,Jangan masukin huruf!!!")
+
+    def dapatkan_predikat(self, rata_rata):
+        """
+        Fungsi untuk menentukan predikat berdasarkan rata-rata nilai.
+        """
+        if rata_rata >= 90:
+            return "A"
+        elif rata_rata >= 80:
+            return "B"
+        elif rata_rata >= 70:
+            return "C"
+        elif rata_rata >= 60:
+            return "D"
+        else:
+            return "E"
+
+    def tampilkan_history(self):
+        """
+        Fungsi untuk menampilkan history perhitungan rata-rata.
+        """
+        self.history_text.config(state='normal')
+        self.history_text.delete(1.0, tk.END)
+        for entry in self.history:
+            self.history_text.insert(tk.END, entry + "\n")
+        self.history_text.config(state='disabled')
+
+    def save_history(self):
+        """
+        Fungsi untuk menyimpan history ke file lokal.
+        """
+        with open('history.json', 'w') as f:
+            json.dump(list(self.history), f)
+
+    def load_history(self):
+        """
+        Fungsi untuk memuat history dari file lokal.
+        """
+        if os.path.exists('history.json'):
+            with open('history.json', 'r') as f:
+                loaded_history = json.load(f)
+                self.history = deque(loaded_history, maxlen=10)
+
+    def simpan_history_teks(self):
+        """
+        Fungsi untuk menyimpan history ke file teks.
+        """
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if file_path:
+            with open(file_path, 'w') as f:
+                for entry in self.history:
+                    f.write(entry + "\n")
+            messagebox.showinfo("Simpan History", "History berhasil disimpan!!")
+
+    def reset_history(self):
+        """
+        Fungsi untuk mereset history.
+        """
+        if messagebox.askyesno("Reset History", "Apakah Anda yakin ingin mereset history???"):
+            self.history.clear()
+            self.save_history()
+            self.tampilkan_history()
+            messagebox.showinfo("Reset History", "History berhasil direset!!!")
+
+    # Setter and getter methods
+    def set_nama_siswa(self, nama):
+        self.nama_entry.delete(0, tk.END)
+        self.nama_entry.insert(0, nama)
+
+    def get_nama_siswa(self):
+        return self.nama_entry.get()
+
+    def set_jumlah_nilai(self, jumlah):
+        self.jumlah_nilai_entry.delete(0, tk.END)
+        self.jumlah_nilai_entry.insert(0, str(jumlah))
+
+    def get_jumlah_nilai(self):
+        return int(self.jumlah_nilai_entry.get())
+
+    def set_nilai(self, index, nilai):
+        if 0 <= index < len(self.nilai_entri_list):
+            self.nilai_entri_list[index].delete(0, tk.END)
+            self.nilai_entri_list[index].insert(0, str(nilai))
+
+    def get_nilai(self, index):
+        if 0 <= index < len(self.nilai_entri_list):
+            return float(self.nilai_entri_list[index].get())
+
+    def set_include(self, index, include):
+        if 0 <= index < len(self.include_checkbox_list):
+            self.include_checkbox_list[index].set(include)
+
+    def get_include(self, index):
+        if 0 <= index < len(self.include_checkbox_list):
+            return self.include_checkbox_list[index].get()
+
+# Membuat jendela utama dan menjalankan aplikasi
+root = tk.Tk()
+app = NilaiSiswaApp(root)
+root.mainloop()
