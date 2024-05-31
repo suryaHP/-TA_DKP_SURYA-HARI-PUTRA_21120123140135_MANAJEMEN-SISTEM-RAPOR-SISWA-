@@ -24,7 +24,7 @@ class NilaiSiswaApp:
         self.input_frame.pack(padx=10, pady=10)
 
         # Label dan entry untuk nama siswa
-        self.label_nama = tk.Label(self.input_frame, text="Nama Siswa:", bg='green')
+        self.label_nama = tk.Label(self.input_frame, text="Nama Siswa:", bg='cyan')
         self.label_nama.grid(row=0, column=0, padx=5, pady=5)
         
         # Validasi nama siswa hanya berupa huruf
@@ -33,13 +33,13 @@ class NilaiSiswaApp:
         self.nama_entry.grid(row=0, column=1, padx=5, pady=5)
 
         # Label dan entry untuk jumlah nilai
-        self.label_jumlah_nilai = tk.Label(self.input_frame, text="Jumlah Nilai:", bg='green')
+        self.label_jumlah_nilai = tk.Label(self.input_frame, text="Jumlah Nilai:", bg='cyan')
         self.label_jumlah_nilai.grid(row=1, column=0, padx=5, pady=5)
         self.jumlah_nilai_entry = tk.Entry(self.input_frame)
         self.jumlah_nilai_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # Tombol untuk membuat entri nilai
-        self.buat_entri_button = tk.Button(self.input_frame, text="Buat Entri Nilai",bg='green', command=self.buat_entri_nilai ) 
+        self.buat_entri_button = tk.Button(self.input_frame, text="Buat Entri Nilai",bg='lime', command=self.buat_entri_nilai ) 
         self.buat_entri_button.grid(row=1, column=2, padx=5, pady=5)
         
 
